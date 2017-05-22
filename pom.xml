@@ -12,7 +12,7 @@
     <artifactId>kafka-lag-based-assignor</artifactId>
     <name>${project.artifactId}</name>
     <packaging>jar</packaging>
-    <version>1.0.3-RC-SNAPSHOT</version>
+    <version>1.0.3</version>
 
     <description>
         Kafka partition assignor that distributes lag evenly across a consumer group
