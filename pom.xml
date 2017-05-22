@@ -18,6 +18,8 @@
         Kafka partition assignor that distributes lag evenly across a consumer group
     </description>
 
+    <url>https://github.com/grantneale/kafka-lag-based-assignor</url>
+
     <inceptionYear>2017</inceptionYear>
 
     <licenses>
