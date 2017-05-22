@@ -1,7 +1,22 @@
 # kafka-lag-based-assignor
+
 Kafka partition assignor that distributes lag evenly across a consumer group.
 
 Requires Kafka 0.10.0.0 or later.
+
+To configure a Kafka consumer group to use lag-based partition assignment:
+
+1.  Add the following maven dependency to your Kafka consumer application:
+    ```xml
+    <dependency>
+        <groupId>com.github.grantneale</groupId>
+        <artifactId>kafka-lag-based-assignor</artifactId>
+    </dependency>
+    ```  
+2.  Set the following in your Kafka consumer properties:
+    ```properties
+    partition.assignment.strategy = com.github.grantneale.kafka.LagBasedPartitionAssignor
+    ```  
 
 ## Overview
 
