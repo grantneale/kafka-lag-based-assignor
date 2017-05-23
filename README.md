@@ -31,7 +31,11 @@ of message currently available in that partition.
 
 We then create a map storing the current total lag of all partitions assigned to each member of the consumer group.
 Partitions are assigned in decreasing order of lag, with each partition assigned to the consumer with least total
-lag.
+number of assigned partitions, breaking ties by assigning to the consumer with the least total assigned lag.
+
+Distributing partitions evenly across consumers (by count) ensures that the partition assignment is balanced when
+all partitions have a current lag of 0 or if the distribution of lags is heavily skewed.  It also gives the consumer
+group the best possible chance of remaining balanced if the assignment is retained for a long period.
 
 ### Example: LagBasedPartitionAssignor
 

@@ -48,7 +48,11 @@ import org.slf4j.LoggerFactory;
  *
  * We then create a map storing the current total lag of all partitions assigned to each member of the consumer group.
  * Partitions are assigned in decreasing order of lag, with each partition assigned to the consumer with least total
- * lag.
+ * number of assigned partitions, breaking ties by assigning to the consumer with the least total assigned lag.
+ *
+ * Distributing partitions as evenly across consumers (by count) ensures that the partition assignment is balanced when
+ * all partitions have a current lag of 0 or if the distribution of lags is heavily skewed.  It also gives the consumer
+ * group the best possible chance of remaining balanced if the assignment is retained for a long period.
  *
  * For example, suppose there are two consumers C0 and C1, both subscribed to a topic t0 having 3 partitions with the
  * following lags:
@@ -111,6 +115,7 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
         // Create a new consumer that can be used to get lag metadata for the consumer group
         metadataConsumerProps = new Properties();
         metadataConsumerProps.putAll(consumerGroupProps);
+        metadataConsumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         final String clientId = groupId + ".assignor";
         metadataConsumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
 
@@ -222,6 +227,12 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
             consumerTotalLags.put(memberId, 0L);
         }
 
+        // Track total number of partitions assigned to each consumer (for the current topic)
+        final Map<String, Integer> consumerTotalPartitions = new HashMap<>(consumers.size());
+        for (String memberId : consumers) {
+            consumerTotalPartitions.put(memberId, 0);
+        }
+
         // Assign partitions in descending order of lag, then ascending by partition
         partitionLags.sort((p1, p2) -> {
             // If lag is equal, lowest partition id first
@@ -234,22 +245,34 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
 
         for (TopicPartitionLag partition : partitionLags) {
 
-            // Assign to the consumer with smallest total lag
+            // Assign to the consumer with least number of partitions, then smallest total lag, then smallest id
             final String memberId = Collections
                 .min(
                     consumerTotalLags.entrySet(),
                     (c1, c2) -> {
-                        // If total lag is equal, lowest consumer id first
-                        if (c1.getValue().compareTo(c2.getValue()) == 0) {
-                            return c1.getKey().compareTo(c2.getKey());
+
+                        // Lowest partition count first
+                        final int comparePartitionCount = Integer.compare(consumerTotalPartitions.get(c1.getKey()),
+                                                                          consumerTotalPartitions.get(c2.getKey()));
+                        if (comparePartitionCount != 0) {
+                            return comparePartitionCount;
                         }
-                        // Lowest total lag first
-                        return c1.getValue().compareTo(c2.getValue());
+
+                        // If partition count is equal, lowest total lag first
+                        final int compareTotalLags = Long.compare(c1.getValue(), c2.getValue());
+                        if (compareTotalLags != 0) {
+                            return compareTotalLags;
+                        }
+
+                        // If total lag is equal, lowest consumer id first
+                        return c1.getKey().compareTo(c2.getKey());
+
                     }
                 )
                 .getKey();
             assignment.get(memberId).add(new TopicPartition(partition.getTopic(), partition.getPartition()));
             consumerTotalLags.put(memberId, consumerTotalLags.getOrDefault(memberId, 0L) + partition.getLag());
+            consumerTotalPartitions.put(memberId, consumerTotalPartitions.getOrDefault(memberId, 0) + 1);
 
             LOGGER.trace(
                 "Assigned partition {}-{} to consumer {}.  partition_lag={}, consumer_current_total_lag={}",

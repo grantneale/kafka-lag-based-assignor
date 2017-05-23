@@ -1,10 +1,13 @@
 package com.github.grantneale.kafka;
 
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.core.Is.is;
 
 import com.github.grantneale.kafka.LagBasedPartitionAssignor.TopicPartitionLag;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -125,6 +128,102 @@ public class LagBasedPartitionAssignorTest {
             LagBasedPartitionAssignor.assign(partitionLagPerTopic, subscriptions);
 
         Assert.assertThat(actualAssignment.entrySet(), is(expectedAssignment.entrySet()));
+
+    }
+
+    @Test
+    public void testAssignWithZeroLags() {
+
+        final Map<String, List<TopicPartitionLag>> partitionLagPerTopic = ImmutableMap.of(
+            "topic1",
+            Arrays.asList(
+                new TopicPartitionLag("topic1", 0, 0),
+                new TopicPartitionLag("topic1", 1, 0),
+                new TopicPartitionLag("topic1", 2, 0),
+                new TopicPartitionLag("topic1", 3, 0),
+                new TopicPartitionLag("topic1", 4, 0),
+                new TopicPartitionLag("topic1", 5, 0),
+                new TopicPartitionLag("topic1", 6, 0)
+            )
+        );
+
+        final Map<String, List<String>> subscriptions = ImmutableMap.of(
+            "consumer-1",
+            Collections.singletonList("topic1"),
+            "consumer-2",
+            Collections.singletonList("topic1")
+        );
+
+        final Map<String, List<TopicPartition>> actualAssignment =
+            LagBasedPartitionAssignor.assign(partitionLagPerTopic, subscriptions);
+
+        final int maxAssignedPartitions = Collections.max(
+            actualAssignment.values(),
+            Comparator.comparingInt(List::size)
+        ).size();
+
+        final int minAssignedPartitions = Collections.min(
+            actualAssignment.values(),
+            Comparator.comparingInt(List::size)
+        ).size();
+
+        Assert.assertThat("Partitions should be distributed evenly amongst consumers",
+                          maxAssignedPartitions,
+                          is(lessThanOrEqualTo(minAssignedPartitions + 1))
+        );
+
+    }
+
+    @Test
+    public void testAssignWithHeavilySkewedLags() {
+
+        // For this test, the number of partitions must NOT be divisible by the number of consumers
+        final Map<String, List<TopicPartitionLag>> partitionLagPerTopic = ImmutableMap.of(
+            "topic1",
+            Arrays.asList(
+                new TopicPartitionLag("topic1", 0, 360),
+                new TopicPartitionLag("topic1", 1, 359),
+                new TopicPartitionLag("topic1", 2, 230),
+                new TopicPartitionLag("topic1", 3, 118),
+                new TopicPartitionLag("topic1", 4, 444),
+                new TopicPartitionLag("topic1", 5, 122),
+                new TopicPartitionLag("topic1", 6, 65),
+                new TopicPartitionLag("topic1", 7, 111),
+                new TopicPartitionLag("topic1", 8, 455000),
+                new TopicPartitionLag("topic1", 9, 424000)
+            )
+        );
+
+        final Map<String, List<String>> subscriptions = ImmutableMap.of(
+            "consumer-1",
+            Collections.singletonList("topic1"),
+            "consumer-2",
+            Collections.singletonList("topic1"),
+            "consumer-3",
+            Collections.singletonList("topic1")
+        );
+
+        final Map<String, List<TopicPartition>> actualAssignment =
+            LagBasedPartitionAssignor.assign(partitionLagPerTopic, subscriptions);
+
+        final Map.Entry<String, List<TopicPartition>> consumerWithMaxPartitions = Collections.max(
+            actualAssignment.entrySet(),
+            Map.Entry.comparingByValue(Comparator.comparingInt(List::size))
+        );
+        final Map.Entry<String, List<TopicPartition>> consumerWithMinPartitions = Collections.min(
+            actualAssignment.entrySet(),
+            Map.Entry.comparingByValue(Comparator.comparingInt(List::size))
+        );
+
+        final int maxAssignedPartitions = consumerWithMaxPartitions.getValue().size();
+        final int minAssignedPartitions = consumerWithMinPartitions.getValue().size();
+
+        Assert.assertThat("Partitions should be distributed evenly amongst consumers",
+                          maxAssignedPartitions,
+                          is(lessThanOrEqualTo(minAssignedPartitions + 1))
+        );
+
+        // TODO assert that the consumer with the highest lag is assigned the smallest number of partitions
 
     }
 
