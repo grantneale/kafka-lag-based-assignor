@@ -223,7 +223,7 @@ public class LagBasedPartitionAssignorTest {
                           is(lessThanOrEqualTo(minAssignedPartitions + 1))
         );
 
-        // TODO assert that the consumer with the highest lag is assigned the smallest number of partitions
+        // TODO assert that the consumer with the highest lag is assigned the equal smallest number of partitions
 
     }
 

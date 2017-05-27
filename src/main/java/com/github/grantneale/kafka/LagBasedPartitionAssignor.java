@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * For each topic, we first obtain the lag on all partitions.  Lag on a given partition is the difference between the
  * end offset and the last offset committed by the consumer group.  If no offsets have been committed for a partition we
  * determine the lag based on the {@code auto.offset.reset} property.  If {@code auto.offset.reset=latest}, we assign a
- * lag of 0.  If {@code auto.offset.reset=earliest} (or any other value) we assume assign lag equal to the total number
+ * lag of 0.  If {@code auto.offset.reset=earliest} (or any other value) we assign lag equal to the total number
  * of message currently available in that partition.
  *
  * We then create a map storing the current total lag of all partitions assigned to each member of the consumer group.
@@ -365,7 +365,7 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
                 }
 
             } else {
-                LOGGER.warn("Skipping assignment for topic {} since no metadata is available", topic);
+                LOGGER.warn("Skipping assignment for topic {} as no metadata is available", topic);
             }
         }
 

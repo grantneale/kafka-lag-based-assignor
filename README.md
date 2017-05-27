@@ -2,7 +2,9 @@
 
 Kafka partition assignor that distributes lag evenly across a consumer group.
 
-Requires Kafka 0.10.0.0 or later.
+**Requirements:**
+- Kafka 0.10.0.0 or later
+- Java 8
 
 To configure a Kafka consumer group to use lag-based partition assignment:
 
@@ -26,7 +28,7 @@ distributed evenly across a consumer group.
 For each topic, we first obtain the lag on all partitions.  Lag on a given partition is the difference between the
 end offset and the last offset committed by the consumer group.  If no offsets have been committed for a partition we
 determine the lag based on the `code auto.offset.reset` property.  If `auto.offset.reset=latest`, we assign a
-lag of 0.  If `auto.offset.reset=earliest` (or any other value) we assume assign lag equal to the total number
+lag of 0.  If `auto.offset.reset=earliest` (or any other value) we assign lag equal to the total number
 of message currently available in that partition.
 
 We then create a map storing the current total lag of all partitions assigned to each member of the consumer group.
