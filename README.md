@@ -45,8 +45,8 @@ For example, suppose there are two consumers `C0` and `C1`, both subscribed to a
 following lags:
 
     t0p0: 100,000
-    t0p1:  50,000
-    t0p2:  60,000
+    t0p1:  60,000
+    t0p2:  50,000
 
 The assignment will be:
 
