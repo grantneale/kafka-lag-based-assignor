@@ -76,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * C0: 160,000
  * C1:  50,000
  *
- * @see PartitionAssignor
+ * @see ConsumerPartitionAssignor
  * @see org.apache.kafka.clients.consumer.internals.AbstractPartitionAssignor
  * @see org.apache.kafka.clients.consumer.RangeAssignor
  */
