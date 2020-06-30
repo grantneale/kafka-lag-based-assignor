@@ -26,9 +26,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.clients.consumer.internals.PartitionAssignor;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.PartitionInfo;
@@ -76,11 +76,11 @@ import org.slf4j.LoggerFactory;
  * C0: 160,000
  * C1:  50,000
  *
- * @see PartitionAssignor
+ * @see ConsumerPartitionAssignor
  * @see org.apache.kafka.clients.consumer.internals.AbstractPartitionAssignor
  * @see org.apache.kafka.clients.consumer.RangeAssignor
  */
-public class LagBasedPartitionAssignor implements PartitionAssignor, Configurable {
+public class LagBasedPartitionAssignor implements ConsumerPartitionAssignor, Configurable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LagBasedPartitionAssignor.class);
 
@@ -135,16 +135,11 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
     }
 
     @Override
-    public Subscription subscription(Set<String> topics) {
-        return new Subscription(new ArrayList<>(topics));
-    }
-
-    @Override
-    public Map<String, Assignment> assign(Cluster metadata, Map<String, Subscription> subscriptions) {
+    public GroupAssignment assign(Cluster metadata, GroupSubscription subscriptions) {
 
         final Set<String> allSubscribedTopics = new HashSet<>();
         final Map<String, List<String>> topicSubscriptions = new HashMap<>();
-        for (Map.Entry<String, Subscription> subscriptionEntry : subscriptions.entrySet()) {
+        for (Map.Entry<String, Subscription> subscriptionEntry : subscriptions.groupSubscription().entrySet()) {
             List<String> topics = subscriptionEntry.getValue().topics();
             allSubscribedTopics.addAll(topics);
             topicSubscriptions.put(subscriptionEntry.getKey(), topics);
@@ -155,14 +150,10 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
 
         // this class has maintains no user data, so just wrap the results
         Map<String, Assignment> assignments = new HashMap<>();
-        for (Map.Entry<String, List<TopicPartition>> assignmentEntry : rawAssignments.entrySet())
+        for (Map.Entry<String, List<TopicPartition>> assignmentEntry : rawAssignments.entrySet()) {
             assignments.put(assignmentEntry.getKey(), new Assignment(assignmentEntry.getValue()));
-        return assignments;
-    }
-
-    @Override
-    public void onAssignment(Assignment assignment) {
-        // nothing to do
+        }
+        return new GroupAssignment(assignments);
     }
 
     /**
@@ -348,14 +339,14 @@ public class LagBasedPartitionAssignor implements PartitionAssignor, Configurabl
                 final Map<TopicPartition, Long> topicBeginOffsets = metadataConsumer.beginningOffsets(topicPartitions);
                 final Map<TopicPartition, Long> topicEndOffsets = metadataConsumer.endOffsets(topicPartitions);
 
+                Map<TopicPartition, OffsetAndMetadata> partitionMetadata = metadataConsumer.committed(new HashSet<>(topicPartitions));
                 // Determine lag for each partition
                 for (TopicPartition partition : topicPartitions) {
 
-                    final OffsetAndMetadata partitionMetadata = metadataConsumer.committed(partition);
                     final String autoOffsetResetMode = consumerGroupProps
                         .getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
                     final long lag = computePartitionLag(
-                        partitionMetadata,
+                        partitionMetadata.get(partition),
                         topicBeginOffsets.getOrDefault(partition, 0L),
                         topicEndOffsets.getOrDefault(partition, 0L),
                         autoOffsetResetMode
